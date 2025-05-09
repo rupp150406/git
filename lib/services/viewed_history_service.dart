@@ -1,42 +1,69 @@
 import 'package:flutter/material.dart';
+import 'package:hive/hive.dart';
 
 class ViewedHistoryService extends ChangeNotifier {
   static final ViewedHistoryService instance = ViewedHistoryService._();
   ViewedHistoryService._();
 
-  final List<Map<String, dynamic>> _viewedContents = [];
-  static const int _historyLimit = 20; // Batas jumlah item riwayat
+  static const String _boxName = 'viewed_history';
+  static const int _historyLimit = 20;
+  Box<Map>? _box;
 
-  List<Map<String, dynamic>> get viewedHistory => _viewedContents;
+  Future<void> init() async {
+    _box = await Hive.openBox<Map>(_boxName);
+  }
 
-  void addToHistory(Map<String, dynamic> contentData) {
-    // Cek apakah konten sudah ada di riwayat (mungkin berdasarkan ID)
-    final existingIndex = _viewedContents.indexWhere(
-      (item) => item['id'] == contentData['id'],
+  List<Map<String, dynamic>> get viewedHistory {
+    if (_box == null) return [];
+    return _box!.values.map((data) => Map<String, dynamic>.from(data)).toList();
+  }
+
+  Future<void> addToHistory(Map<String, dynamic> contentData) async {
+    if (_box == null) await init();
+
+    // Check if content already exists
+    final existingKey = _box!.keys.firstWhere(
+      (k) => _box!.get(k)!['id'] == contentData['id'],
+      orElse: () => null,
     );
 
-    if (existingIndex != -1) {
-      // Jika sudah ada, pindahkan ke bagian atas (terakhir dilihat)
-      final existingItem = _viewedContents.removeAt(existingIndex);
-      _viewedContents.insert(0, existingItem);
-    } else {
-      // Jika belum ada, tambahkan ke bagian atas
-      _viewedContents.insert(0, contentData);
-      // Jika melebihi batas, hapus item terlama
-      if (_viewedContents.length > _historyLimit) {
-        _viewedContents.removeLast();
+    if (existingKey != null) {
+      // If exists, delete old entry
+      await _box!.delete(existingKey);
+    }
+
+    // Add new entry at the beginning
+    await _box!.add(contentData);
+
+    // Remove oldest entries if exceeding limit
+    final allKeys = _box!.keys.toList();
+    if (allKeys.length > _historyLimit) {
+      final keysToRemove = allKeys.sublist(0, allKeys.length - _historyLimit);
+      for (var key in keysToRemove) {
+        await _box!.delete(key);
       }
     }
+
     notifyListeners();
   }
 
-  void clearHistory() {
-    _viewedContents.clear();
+  Future<void> clearHistory() async {
+    if (_box == null) await init();
+    await _box!.clear();
     notifyListeners();
   }
 
-  void removeItem(String contentId) {
-    _viewedContents.removeWhere((item) => item['id'] == contentId);
-    notifyListeners();
+  Future<void> removeItem(String contentId) async {
+    if (_box == null) await init();
+
+    final key = _box!.keys.firstWhere(
+      (k) => _box!.get(k)!['id'] == contentId,
+      orElse: () => null,
+    );
+
+    if (key != null) {
+      await _box!.delete(key);
+      notifyListeners();
+    }
   }
 }

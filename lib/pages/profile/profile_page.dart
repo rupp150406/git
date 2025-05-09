@@ -100,9 +100,26 @@ class _ProfilePageState extends State<ProfilePage> {
                           );
 
                           if (shouldLogout == true && mounted) {
-                            Navigator.pushReplacementNamed(
-                              context,
+                            // Get username before clearing data
+                            final username =
+                                await LocalBackendService.instance
+                                    .getUsername();
+
+                            // Delete all blogs by this user
+                            await deleteAllBlogsByAuthor(username);
+
+                            // Clear all user data
+                            await LocalBackendService.instance.clearUserData();
+                            // Delete user profile from Hive
+                            await deleteUserProfile();
+
+                            if (!mounted) return;
+
+                            // Navigate to sign in and remove all previous routes
+                            Navigator.of(context).pushNamedAndRemoveUntil(
                               signInRoute,
+                              (route) =>
+                                  false, // This removes all previous routes
                             );
                           }
                         },

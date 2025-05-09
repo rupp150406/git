@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:blogin/services/local_backend_service.dart';
 import 'package:blogin/services/hive_backend.dart'; // Import the hive_backend.dart file
+import 'package:blogin/services/saved_content_service.dart';
+import 'package:blogin/services/viewed_history_service.dart';
 import 'package:blogin/routes/route.dart' as router; // Import your router
 
 void main() async {
@@ -9,6 +11,8 @@ void main() async {
   // Initialize services
   await LocalBackendService.instance.init(); // Initialize Shared Preferences
   await initializeHiveForBlog(); // Initialize Hive (top-level function)
+  await SavedContentService.instance.init();
+  await ViewedHistoryService.instance.init();
 
   runApp(const MyApp());
 }

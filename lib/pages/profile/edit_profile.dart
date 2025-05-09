@@ -87,9 +87,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
         );
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Profile updated successfully!')),
-          );
+          Navigator.of(
+            context,
+          ).pushReplacementNamed(saveProfileDoneSplashRoute);
         }
       } catch (e) {
         if (mounted) {
@@ -429,7 +429,16 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                 width: 140,
                                 height: 48,
                                 child: ElevatedButton(
-                                  onPressed: _saveProfile, //addprofleroute
+                                  onPressed: () async {
+                                    await _saveProfile();
+                                    if (mounted) {
+                                      Navigator.of(
+                                        context,
+                                      ).pushReplacementNamed(
+                                        saveProfileDoneSplashRoute,
+                                      );
+                                    }
+                                  },
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.black,
                                     foregroundColor: Colors.white,

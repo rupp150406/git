@@ -23,6 +23,7 @@ import 'package:blogin/services/hive_backend.dart';
 import 'package:blogin/pages/blog/publish_option.dart';
 import 'package:blogin/pages/profile/logout_done.dart';
 import 'package:blogin/pages/blog/blog_done.dart';
+import 'package:blogin/pages/profile/save_profile_done_splash.dart';
 
 // Route Names
 const String splashRoute = '/splash';
@@ -45,6 +46,7 @@ const String libraryPageRoute = '/library-page';
 const String searchPageRoute = '/search-page';
 const String editProfileRoute = '/edit-profile';
 const String editProfileDoneSplashRoute = '/edit-profile-done-splash';
+const String saveProfileDoneSplashRoute = '/save-profile-done-splash';
 const String blogMakerRoute = '/blog-maker';
 const String notFoundRoute = '/';
 const String contentPageRoute = '/content-page';
@@ -122,6 +124,10 @@ Route<dynamic> generateRoute(RouteSettings settings) {
       return MaterialPageRoute(builder: (_) => const LogoutDoneSplashScreen());
     case blogDoneSplashRoute:
       return MaterialPageRoute(builder: (_) => const BlogDoneSplashScreen());
+    case saveProfileDoneSplashRoute:
+      return MaterialPageRoute(
+        builder: (_) => const SaveProfileDoneSplashScreen(),
+      );
     // Default case for unknown routes
     default:
       return MaterialPageRoute(builder: (_) => const NotFoundPage());
