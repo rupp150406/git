@@ -1,0 +1,30 @@
+Oke, dengarkan baik-baik! Sekarang kita akan membuat halaman edit profile (edit_profile.dart) dan ini harus identik dengan gambar ini, piksel per piksel! Jangan sampai ada perbedaan sekecil apapun!
+
+Pertama, di bagian paling atas app bar, persis di sudut kiri, letakkan ikon panah kembali berwarna hitam. Pastikan ikon ini sama persis dengan ikon kembali standar iOS. Di bagian tengah app bar, jangan ada teks atau widget lain, biarkan kosong.
+
+Kemudian, tepat di bawah app bar, di tengah layar, tampilkan sebuah CircleAvatar yang menampilkan foto profil. Gunakan gambar dari asset assets/images/profile-photo.png untuk ini. Pastikan bentuknya bulat sempurna dan ukurannya pas seperti di gambar. Di sudut kanan bawah CircleAvatar, tambahkan ikon kamera kecil berwarna hitam dengan latar belakang putih atau abu-abu muda, persis seperti di gambar. Ikon ini tidak perlu memiliki fungsi apa pun untuk sekarang.
+
+Di bawah foto profil, berikan jarak vertikal yang sesuai seperti di gambar, lalu buat dua kolom input teks secara berurutan:
+
+Kolom Input Username:
+
+Di sisi kiri, sejajar vertikal dengan bagian atas kolom input, letakkan label teks "Username" dengan gaya teks hitam, ukuran sedang, dan font-weight yang sesuai seperti di gambar.
+Buat sebuah TextFormField untuk input username. Isi awal kolom ini harus diambil dari data username yang tersimpan di local_backend_service.dart. Tampilkan border berupa garis tipis berwarna abu-abu muda di sekeliling kolom input, dengan sudut membulat seperti di gambar.
+Kolom Input Email:
+
+Berikan jarak vertikal yang sama seperti sebelumnya, lalu di sisi kiri, sejajar vertikal dengan bagian atas kolom input, letakkan label teks "Email" dengan gaya teks yang sama seperti label "Username".
+Buat lagi sebuah TextFormField untuk input email. Isi awal kolom ini harus diambil dari data email yang tersimpan di local_backend_service.dart. Tampilkan border berupa garis tipis berwarna abu-abu muda di sekeliling kolom input, dengan sudut membulat yang sama seperti kolom username.
+Berikan jarak vertikal yang lebih besar di bawah kolom input email, lalu buat sebuah tombol "Save" yang lebar, hampir memenuhi lebar layar, dan posisinya di tengah horizontal. Tombol ini harus berwarna hitam solid dengan teks "Save" berwarna putih di tengahnya. Bentuk tombol harus oval atau rounded rectangle dengan border radius yang cukup besar seperti di gambar. Fungsi tombol "Save" adalah untuk mengkonfirmasi pengeditan. Saat tombol ini ditekan, panggil fungsi dari local_backend_service.dart untuk menyimpan perubahan username dan email yang ada di kolom input. Berikan umpan balik visual sederhana setelah penyimpanan berhasil (misalnya, snackbar).
+
+Berikan jarak vertikal lagi di bawah tombol "Save", lalu buat sebuah tombol "Delete Account" yang memiliki tampilan yang sama persis dengan tombol "Save" (warna hitam solid, teks putih, bentuk oval/rounded rectangle, lebar hampir penuh di tengah). Untuk saat ini, fungsi tombol "Delete Account" dikosongkan saja, tidak perlu ada aksi apa pun saat tombol ini ditekan.
+
+Terakhir, di bagian paling bawah halaman, panggil custom navigation bar (custom_navbar.dart) yang sudah kita buat. Pastikan semua ikon dan label di navbar ini terlihat dan berfungsi dengan baik sesuai dengan desain yang sudah kita sepakati.
+
+Poin-poin penting yang harus diperhatikan:
+
+Tampilan Harus Identik: Perhatikan betul spacing (jarak antar elemen), padding (ruang di dalam elemen), warna teks, warna hint, gaya border kolom input, warna dan bentuk tombol. Semuanya harus persis sama dengan gambar.
+Pengambilan Data Awal: Isi awal kolom "Username" dan "Email" wajib diambil dari local_backend_service.dart.
+Fungsi Tombol "Save": Menyimpan perubahan username dan email menggunakan local_backend_service.dart.
+Fungsi Tombol "Delete Account": Dikosongkan untuk saat ini.
+Bottom Navigation Bar: Wajib ada custom_navbar.dart di bagian bawah.
+Kerjakan ini dengan teliti dan pastikan tidak ada detail yang terlewat. Ini harus menjadi replika visual yang sempurna. Selamat bekerja!
