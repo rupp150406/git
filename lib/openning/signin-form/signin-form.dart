@@ -1,9 +1,12 @@
 // import 'package:blogin/account/sign-up-form/signup_form.dart';
+import 'package:blogin/openning/password-change/email_input.dart';
 import 'package:blogin/widgets/custom%20button/custom_button.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:blogin/routes/route.dart'; // Import routes
+import 'package:blogin/services/user_service.dart'; // Import UserService
 import 'package:blogin/services/local_backend_service.dart'; // Import LocalBackendService
+import 'package:blogin/widgets/loading/loading.dart'; // Import LoadingVideo
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -16,6 +19,7 @@ class _SignInScreenState extends State<SignInScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -192,10 +196,7 @@ class _SignInScreenState extends State<SignInScreen> {
                           Align(
                             alignment: Alignment.centerRight,
                             child: TextButton(
-                              onPressed: () {
-                                // Navigate using named route
-                                Navigator.pushNamed(context, emailInputRoute);
-                              },
+                              onPressed: () {},
                               style: TextButton.styleFrom(
                                 padding:
                                     EdgeInsets.zero, // Remove default padding
@@ -218,45 +219,158 @@ class _SignInScreenState extends State<SignInScreen> {
                           // Sign In Button
                           SizedBox(
                             width: double.infinity,
-                            child: CustomButton(
-                              // Use the custom button
-                              text: 'Sign In',
-                              onPressed: () async {
-                                // Get entered credentials
-                                final String enteredEmail =
-                                    _emailController.text.trim();
-                                final String enteredPassword =
-                                    _passwordController.text.trim();
+                            child:
+                                _isLoading
+                                    ? const Center(
+                                      child: CircularProgressIndicator(),
+                                    )
+                                    : CustomButton(
+                                      // Use the custom button
+                                      text: 'Sign In',
+                                      onPressed: () async {
+                                        // Get entered credentials
+                                        final String enteredEmail =
+                                            _emailController.text.trim();
+                                        final String enteredPassword =
+                                            _passwordController.text.trim();
 
-                                // Get stored credentials from LocalBackendService
-                                final String? storedEmail =
-                                    await LocalBackendService.instance
-                                        .getEmail();
-                                final String? storedPassword =
-                                    await LocalBackendService.instance
-                                        .getPassword();
+                                        // Validate inputs
+                                        if (enteredEmail.isEmpty ||
+                                            enteredPassword.isEmpty) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Please enter both email and password',
+                                              ),
+                                              backgroundColor: Colors.red,
+                                            ),
+                                          );
+                                          return;
+                                        }
 
-                                // Validate credentials against stored data
-                                if (enteredEmail == storedEmail &&
-                                    enteredPassword == storedPassword) {
-                                  // Credentials match, navigate to main page
-                                  Navigator.pushReplacementNamed(
-                                    context,
-                                    mainPageRoute,
-                                  );
-                                } else {
-                                  // Credentials don't match, show error message
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Invalid email or password. Please try again.',
-                                      ),
-                                      backgroundColor: Colors.red,
+                                        // Show loading indicator
+                                        setState(() => _isLoading = true);
+
+                                        try {
+                                          // Show fullscreen loading
+                                          showDialog(
+                                            context: context,
+                                            barrierDismissible: false,
+                                            barrierColor: Colors.white,
+                                            builder:
+                                                (context) => WillPopScope(
+                                                  onWillPop: () async => false,
+                                                  child: const Scaffold(
+                                                    backgroundColor:
+                                                        Colors.white,
+                                                    body: Center(
+                                                      child: LoadingVideo(),
+                                                    ),
+                                                  ),
+                                                ),
+                                          );
+
+                                          // Use UserService to login with API
+                                          final response = await UserService
+                                              .instance
+                                              .login(
+                                                email: enteredEmail,
+                                                password: enteredPassword,
+                                              );
+
+                                          // Check if login was successful
+                                          if (response['data'] != null &&
+                                              response['data']['token'] !=
+                                                  null) {
+                                            // Save credentials for persistent login
+                                            await LocalBackendService.instance
+                                                .setEmail(enteredEmail);
+                                            await LocalBackendService.instance
+                                                .updatePassword(
+                                                  enteredPassword,
+                                                );
+
+                                            if (response['data']['user'] !=
+                                                    null &&
+                                                response['data']['user']['username'] !=
+                                                    null) {
+                                              await LocalBackendService.instance
+                                                  .setUsername(
+                                                    response['data']['user']['username'],
+                                                  );
+                                            }
+
+                                            // Navigate to main page on success
+                                            if (mounted) {
+                                              // Close loading dialog first
+                                              Navigator.of(
+                                                context,
+                                                rootNavigator: true,
+                                              ).pop();
+                                              Navigator.pushReplacementNamed(
+                                                context,
+                                                mainPageRoute,
+                                              );
+                                            }
+                                          } else {
+                                            // Close loading dialog on error
+                                            if (mounted) {
+                                              Navigator.of(
+                                                context,
+                                                rootNavigator: true,
+                                              ).pop();
+                                            }
+                                            // Handle unexpected response format
+                                            throw Exception(
+                                              'Invalid response from server',
+                                            );
+                                          }
+                                        } catch (e) {
+                                          // Close loading dialog on error if it's showing
+                                          if (mounted) {
+                                            if (Navigator.canPop(context)) {
+                                              Navigator.of(
+                                                context,
+                                                rootNavigator: true,
+                                              ).pop();
+                                            }
+
+                                            // Filter out backend dependency errors
+                                            String errorMessage = e
+                                                .toString()
+                                                .replaceAll('Exception: ', '');
+
+                                            // Hide the Dedoc\Scramble\Scramble specific error
+                                            if (errorMessage.contains(
+                                                  "Dedoc\\Scramble\\Scramble",
+                                                ) ||
+                                                errorMessage.contains(
+                                                  "not found",
+                                                )) {
+                                              errorMessage =
+                                                  "Unable to connect to the server. Please try again later.";
+                                            }
+
+                                            // Show error message
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text(errorMessage),
+                                                backgroundColor: Colors.red,
+                                              ),
+                                            );
+                                          }
+                                        } finally {
+                                          // Hide loading indicator
+                                          if (mounted) {
+                                            setState(() => _isLoading = false);
+                                          }
+                                        }
+                                      },
                                     ),
-                                  );
-                                }
-                              },
-                            ),
                           ),
                         ],
                       ),

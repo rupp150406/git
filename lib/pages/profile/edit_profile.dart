@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:blogin/widgets/custom navbar/custom_navbar.dart';
-import 'package:blogin/services/local_backend_service.dart';
-import 'package:blogin/widgets/custom popup/custom_popup.dart';
+import 'package:blogin/services/user_service.dart';
 import 'package:blogin/routes/route.dart';
-import 'package:blogin/services/hive_backend.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'package:blogin/widgets/loading/loading.dart';
+import 'package:blogin/widgets/custom popup/custom_popup.dart';
+import 'package:blogin/pages/profile/save_profile_done_splash.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class EditProfilePage extends StatefulWidget {
   const EditProfilePage({Key? key}) : super(key: key);
@@ -16,11 +17,15 @@ class EditProfilePage extends StatefulWidget {
 
 class _EditProfilePageState extends State<EditProfilePage> {
   final _formKey = GlobalKey<FormState>();
+  final TextEditingController _nameController = TextEditingController();
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _aboutController = TextEditingController();
-  String? _profilePhotoPath;
-  bool _loading = true;
+  final TextEditingController _bioController = TextEditingController();
+  File? _profilePhoto;
+  String? _existingPhotoUrl;
+  bool _isLoading = true;
+  bool _isSaving = false;
+  bool _hasChanges = false;
 
   @override
   void initState() {
@@ -29,134 +34,149 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Future<void> _loadProfileData() async {
-    final userProfile = await getUserProfile();
-    final username = await LocalBackendService.instance.getUsername();
-    final email = await LocalBackendService.instance.getEmail();
-    final about = LocalBackendService.instance.getAbout();
+    try {
+      final response = await UserService.instance.getProfile();
+      final userData = response['data']['user'];
 
-    setState(() {
-      _usernameController.text = username;
-      _emailController.text = email;
-      _aboutController.text = about;
-      _profilePhotoPath = userProfile?.profilePhotoPath;
-      _loading = false;
-    });
+      // Handle profile picture URL
+      var picturePath = userData['picture'];
+      if (picturePath != null &&
+          picturePath.isNotEmpty &&
+          !picturePath.startsWith('http') &&
+          !picturePath.startsWith('assets/')) {
+        // Check if it's a relative path starting with '/'
+        if (picturePath.startsWith('/')) {
+          picturePath = 'https://blogin.faaza-mumtaza.my.id$picturePath';
+        } else {
+          picturePath = 'https://blogin.faaza-mumtaza.my.id/$picturePath';
+        }
+      }
+
+      print('Edit Profile - Picture URL: $picturePath');
+
+      setState(() {
+        _nameController.text = userData['name'] ?? '';
+        _usernameController.text = userData['username'] ?? '';
+        _emailController.text = userData['email'] ?? '';
+        _bioController.text = userData['bio'] ?? '';
+        _existingPhotoUrl = picturePath;
+        _isLoading = false;
+      });
+
+      // Listen for changes to detect if form is dirty
+      _nameController.addListener(_onFieldChanged);
+      _usernameController.addListener(_onFieldChanged);
+      _emailController.addListener(_onFieldChanged);
+      _bioController.addListener(_onFieldChanged);
+    } catch (e) {
+      print('Error loading profile data: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load profile: ${e.toString()}')),
+        );
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  void _onFieldChanged() {
+    if (!_hasChanges) {
+      setState(() => _hasChanges = true);
+    }
   }
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
     try {
-      final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+      final pickedFile = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800, // Optimize image size
+        maxHeight: 800,
+        imageQuality: 85,
+      );
       if (pickedFile != null) {
         setState(() {
-          _profilePhotoPath = pickedFile.path;
+          _profilePhoto = File(pickedFile.path);
+          _hasChanges = true;
         });
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error picking image: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error picking image: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
 
   @override
   void dispose() {
+    _nameController.removeListener(_onFieldChanged);
+    _usernameController.removeListener(_onFieldChanged);
+    _emailController.removeListener(_onFieldChanged);
+    _bioController.removeListener(_onFieldChanged);
+
+    _nameController.dispose();
     _usernameController.dispose();
     _emailController.dispose();
-    _aboutController.dispose();
+    _bioController.dispose();
     super.dispose();
   }
 
   Future<void> _saveProfile() async {
     if (_formKey.currentState?.validate() ?? false) {
-      setState(() => _loading = true);
-      try {
-        // Save to LocalBackendService
-        await LocalBackendService.instance.setUsername(
-          _usernameController.text,
-        );
-        await LocalBackendService.instance.setEmail(_emailController.text);
-        await LocalBackendService.instance.setAbout(_aboutController.text);
+      // Show fullscreen loading overlay
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        barrierColor: Colors.white, // Make barrier white for fullscreen effect
+        builder:
+            (context) => WillPopScope(
+              onWillPop: () async => false, // Prevent back button dismissal
+              child: const Scaffold(
+                backgroundColor: Colors.white,
+                body: Center(child: LoadingVideo()),
+              ),
+            ),
+      );
 
-        // Save to Hive
-        await saveUserProfile(
+      setState(() => _isSaving = true);
+      try {
+        final response = await UserService.instance.updateProfile(
+          name: _nameController.text,
           username: _usernameController.text,
-          profilePhotoPath: _profilePhotoPath,
+          email: _emailController.text,
+          bio: _bioController.text,
+          picture: _profilePhoto,
         );
 
         if (mounted) {
-          Navigator.of(
+          // Close loading dialog
+          Navigator.of(context, rootNavigator: true).pop();
+
+          // Navigate to success splash screen
+          Navigator.pushReplacement(
             context,
-          ).pushReplacementNamed(saveProfileDoneSplashRoute);
+            MaterialPageRoute(
+              builder: (context) => const SaveProfileDoneSplashScreen(),
+            ),
+          );
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Error saving profile: $e')));
-        }
-      } finally {
-        if (mounted) {
-          setState(() => _loading = false);
-        }
-      }
-    }
-  }
+          // Close loading dialog
+          Navigator.of(context, rootNavigator: true).pop();
 
-  Future<void> _deleteAccount() async {
-    // Show confirmation dialog
-    bool? confirmDelete = await showCustomPopup(
-      context,
-      text: 'Delete Account?',
-      leftButtonText: 'Cancel',
-      rightButtonText: 'Delete',
-      leftButtonOnPressed: () => Navigator.of(context).pop(false),
-      rightButtonOnPressed: () => Navigator.of(context).pop(true),
-    );
-
-    // If user confirms, delete the data
-    if (confirmDelete == true) {
-      try {
-        // Show loading indicator
-        setState(() => _loading = true);
-
-        // Get username before clearing user data
-        final username = await LocalBackendService.instance.getUsername();
-
-        // Delete all blogs by this user
-        await deleteAllBlogsByAuthor(username);
-
-        // Clear user data
-        await LocalBackendService.instance.clearUserData();
-
-        if (!mounted) return;
-
-        // Show success message and navigate
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Account and all associated blogs deleted.'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-
-        // Navigate to sign up screen
-        Navigator.pushReplacementNamed(context, signUpRoute);
-      } catch (e) {
-        if (!mounted) return;
-
-        // Show error message if deletion fails
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error deleting account: ${e.toString()}'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      } finally {
-        if (mounted) {
-          setState(() => _loading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to update profile: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          setState(() => _isSaving = false);
         }
       }
     }
@@ -164,347 +184,417 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    const double avatarRadius = 56;
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: LoadingVideo()),
+        backgroundColor: Colors.white,
+      );
+    }
+
+    final inputBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(color: Colors.grey[300]!),
+    );
+
+    final focusedBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: Colors.black, width: 1.5),
+    );
+
+    final labelStyle = const TextStyle(
+      fontSize: 14,
+      fontWeight: FontWeight.w500,
+      color: Colors.black87,
+    );
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new,
+        title: const Text(
+          'Edit Profile',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
             color: Colors.black,
-            size: 28,
           ),
-          onPressed: () => Navigator.of(context).pop(),
         ),
         centerTitle: true,
-        title: null,
+        backgroundColor: Colors.white,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.black),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () {
+            // Ask for confirmation if there are unsaved changes
+            if (_hasChanges) {
+              showDialog(
+                context: context,
+                builder:
+                    (context) => AlertDialog(
+                      title: const Text('Discard changes?'),
+                      content: const Text(
+                        'You have unsaved changes. Are you sure you want to discard them?',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            Navigator.of(context).pop();
+                          },
+                          child: const Text(
+                            'Discard',
+                            style: TextStyle(color: Colors.red),
+                          ),
+                        ),
+                      ],
+                    ),
+              );
+            } else {
+              Navigator.of(context).pop();
+            }
+          },
+        ),
+        actions: [
+          // Save button in the app bar
+          _isSaving
+              ? const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+              : Container(), // Remove the TextButton
+        ],
       ),
-      body:
-          _loading
-              ? const Center(child: CircularProgressIndicator())
-              : SafeArea(
-                child: SingleChildScrollView(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          const SizedBox(height: 24),
-                          Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              CircleAvatar(
-                                radius: avatarRadius,
-                                backgroundColor: Colors.grey[200],
-                                child:
-                                    _profilePhotoPath != null
-                                        ? ClipOval(
-                                          child: Image.file(
-                                            File(_profilePhotoPath!),
-                                            width: avatarRadius * 2,
-                                            height: avatarRadius * 2,
-                                            fit: BoxFit.cover,
-                                            errorBuilder:
-                                                (context, error, stackTrace) =>
-                                                    const Icon(
-                                                      Icons.person,
-                                                      size: 56,
-                                                      color: Colors.grey,
-                                                    ),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Profile photo section
+                Center(
+                  child: Stack(
+                    children: [
+                      Container(
+                        width: 96,
+                        height: 96,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.grey[200]!,
+                            width: 2,
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(48),
+                          child:
+                              _profilePhoto != null
+                                  ? Image.file(
+                                    _profilePhoto!,
+                                    width: 96,
+                                    height: 96,
+                                    fit: BoxFit.cover,
+                                  )
+                                  : _existingPhotoUrl != null
+                                  ? CachedNetworkImage(
+                                    imageUrl: _existingPhotoUrl!,
+                                    width: 96,
+                                    height: 96,
+                                    fit: BoxFit.cover,
+                                    placeholder:
+                                        (context, url) => const Center(
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
                                           ),
-                                        )
-                                        : const Icon(
+                                        ),
+                                    errorWidget:
+                                        (context, url, error) => const Icon(
                                           Icons.person,
-                                          size: 56,
+                                          size: 48,
                                           color: Colors.grey,
                                         ),
-                              ),
-                              Positioned(
-                                bottom: 0,
-                                right: avatarRadius * 0.1,
-                                child: GestureDetector(
-                                  onTap: _pickImage,
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: Colors.black,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: Colors.white,
-                                        width: 3,
-                                      ),
-                                    ),
-                                    padding: const EdgeInsets.all(4),
-                                    child: const Icon(
-                                      Icons.camera_alt,
-                                      color: Colors.white,
-                                      size: 20,
-                                    ),
+                                  )
+                                  : const Icon(
+                                    Icons.person,
+                                    size: 48,
+                                    color: Colors.grey,
                                   ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 36),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              'Username',
-                              style: const TextStyle(
-                                fontFamily: 'PlusJakartaSans-VariableFont_wght',
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.black,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          TextFormField(
-                            controller: _usernameController,
-                            style: const TextStyle(
-                              fontFamily: 'PlusJakartaSans-VariableFont_wght',
-                              fontSize: 16,
-                              color: Colors.black,
-                            ),
-                            decoration: InputDecoration(
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 16,
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(
-                                  color: Color(0xFFE0E0E0),
-                                  width: 1,
-                                ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(
-                                  color: Color(0xFFE0E0E0),
-                                  width: 1,
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(
-                                  color: Colors.black,
-                                  width: 1.5,
-                                ),
-                              ),
-                              hintText: '',
-                              filled: true,
-                              fillColor: Colors.white,
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter a username';
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 24),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              'Email',
-                              style: const TextStyle(
-                                fontFamily: 'PlusJakartaSans-VariableFont_wght',
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.black,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          TextFormField(
-                            controller: _emailController,
-                            style: const TextStyle(
-                              fontFamily: 'PlusJakartaSans-VariableFont_wght',
-                              fontSize: 16,
-                              color: Colors.black,
-                            ),
-                            decoration: InputDecoration(
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 16,
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(
-                                  color: Color(0xFFE0E0E0),
-                                  width: 1,
-                                ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(
-                                  color: Color(0xFFE0E0E0),
-                                  width: 1,
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(
-                                  color: Colors.black,
-                                  width: 1.5,
-                                ),
-                              ),
-                              hintText: '',
-                              filled: true,
-                              fillColor: Colors.white,
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter an email';
-                              }
-                              if (!RegExp(
-                                r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
-                              ).hasMatch(value)) {
-                                return 'Please enter a valid email';
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 24),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              'About',
-                              style: const TextStyle(
-                                fontFamily: 'PlusJakartaSans-VariableFont_wght',
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.black,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          TextFormField(
-                            controller: _aboutController,
-                            style: const TextStyle(
-                              fontFamily: 'PlusJakartaSans-VariableFont_wght',
-                              fontSize: 16,
-                              color: Colors.black,
-                            ),
-                            decoration: InputDecoration(
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 16,
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(
-                                  color: Color(0xFFE0E0E0),
-                                  width: 1,
-                                ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(
-                                  color: Color(0xFFE0E0E0),
-                                  width: 1,
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(
-                                  color: Colors.black,
-                                  width: 1.5,
-                                ),
-                              ),
-                              hintText: 'about form is empty',
-                              filled: true,
-                              fillColor: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 36),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              SizedBox(
-                                width: 140,
-                                height: 48,
-                                child: ElevatedButton(
-                                  onPressed: () async {
-                                    await _saveProfile();
-                                    if (mounted) {
-                                      Navigator.of(
-                                        context,
-                                      ).pushReplacementNamed(
-                                        saveProfileDoneSplashRoute,
-                                      );
-                                    }
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.black,
-                                    foregroundColor: Colors.white,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(32),
-                                    ),
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 0,
-                                    ),
-                                    elevation: 0,
-                                  ),
-                                  child: const Text(
-                                    'Save',
-                                    style: TextStyle(
-                                      fontFamily:
-                                          'PlusJakartaSans-VariableFont_wght',
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              SizedBox(
-                                width: 140,
-                                height: 48,
-                                child: ElevatedButton(
-                                  onPressed: _deleteAccount,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.white,
-                                    foregroundColor: Colors.black,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(32),
-                                      side: const BorderSide(
-                                        color: Colors.black,
-                                        width: 1,
-                                      ),
-                                    ),
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 0,
-                                    ),
-                                    elevation: 0,
-                                  ),
-                                  child: const Text(
-                                    'Delete Account',
-                                    style: TextStyle(
-                                      fontFamily:
-                                          'PlusJakartaSans-VariableFont_wght',
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.black,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 24),
-                        ],
+                        ),
                       ),
-                    ),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.black,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                          child: InkWell(
+                            onTap: _pickImage,
+                            child: const Icon(
+                              Icons.camera_alt,
+                              size: 16,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-      bottomNavigationBar: const CustomNavBar(selectedIndex: 3),
+                const SizedBox(height: 32),
+
+                // Name field
+                Text('Name', style: labelStyle),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _nameController,
+                  decoration: InputDecoration(
+                    hintText: 'Enter your name',
+                    border: inputBorder,
+                    enabledBorder: inputBorder,
+                    focusedBorder: focusedBorder,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Name is required';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 20),
+
+                // Username field
+                Text('Username', style: labelStyle),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _usernameController,
+                  decoration: InputDecoration(
+                    hintText: 'Enter your username',
+                    border: inputBorder,
+                    enabledBorder: inputBorder,
+                    focusedBorder: focusedBorder,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Username is required';
+                    }
+                    if (value.contains(' ')) {
+                      return 'Username cannot contain spaces';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 20),
+
+                // Email field
+                Text('Email', style: labelStyle),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: InputDecoration(
+                    hintText: 'Enter your email',
+                    border: inputBorder,
+                    enabledBorder: inputBorder,
+                    focusedBorder: focusedBorder,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Email is required';
+                    }
+                    if (!value.contains('@') || !value.contains('.')) {
+                      return 'Please enter a valid email';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 20),
+
+                // Bio field
+                Text('Bio', style: labelStyle),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _bioController,
+                  maxLines: 4,
+                  decoration: InputDecoration(
+                    hintText: 'Write something about yourself',
+                    border: inputBorder,
+                    enabledBorder: inputBorder,
+                    focusedBorder: focusedBorder,
+                    contentPadding: const EdgeInsets.all(16),
+                  ),
+                ),
+                const SizedBox(height: 40),
+
+                // Save and Delete buttons
+                Row(
+                  children: [
+                    // Save button
+                    Expanded(
+                      child: SizedBox(
+                        height: 50,
+                        child: ElevatedButton(
+                          onPressed:
+                              _hasChanges && !_isSaving ? _saveProfile : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.black,
+                            foregroundColor: Colors.white,
+                            disabledBackgroundColor: Colors.grey[300],
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(25),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          child:
+                              _isSaving
+                                  ? const SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                  : const Text(
+                                    'Save',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // Delete Account button
+                    Expanded(
+                      child: SizedBox(
+                        height: 50,
+                        child: OutlinedButton(
+                          onPressed: () {
+                            // Show delete confirmation using CustomPopup
+                            showCustomPopup(
+                              context,
+                              text:
+                                  'Are you sure you want to delete your account? This action cannot be undone.',
+                              leftButtonText: 'Delete',
+                              rightButtonText: 'Cancel',
+                              leftButtonOnPressed: () {
+                                Navigator.of(context).pop();
+                                _deleteAccount();
+                              },
+                              rightButtonOnPressed: () {
+                                Navigator.of(context).pop();
+                              },
+                            );
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.black,
+                            side: const BorderSide(color: Colors.black),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(25),
+                            ),
+                          ),
+                          child: const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              'Delete Account',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
+  }
+
+  Future<void> _deleteAccount() async {
+    // Show fullscreen loading overlay
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.white, // Make barrier white for fullscreen effect
+      builder:
+          (context) => WillPopScope(
+            onWillPop: () async => false, // Prevent back button dismissal
+            child: const Scaffold(
+              backgroundColor: Colors.white,
+              body: Center(child: LoadingVideo()),
+            ),
+          ),
+    );
+
+    try {
+      // Call delete account API
+      await UserService.instance.deleteAccount();
+
+      // Navigate to login screen after successful deletion
+      if (mounted) {
+        Navigator.of(
+          context,
+          rootNavigator: true,
+        ).pop(); // Close loading dialog
+        Navigator.of(
+          context,
+        ).pushNamedAndRemoveUntil(signInRoute, (route) => false);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Account deleted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      // Handle error
+      if (mounted) {
+        Navigator.of(
+          context,
+          rootNavigator: true,
+        ).pop(); // Close loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete account: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }

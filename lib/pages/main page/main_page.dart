@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:blogin/widgets/custom navbar/custom_navbar.dart';
 import 'package:blogin/pages/blog/widget_content.dart';
 import '../../services/hive_backend.dart';
+import 'package:blogin/widgets/loading/loading.dart';
+import 'package:blogin/services/blog_service.dart';
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -44,11 +46,80 @@ class _MainPageState extends State<MainPage> {
   }
 
   Future<void> _fetchBlogPosts() async {
-    final posts = await getAllBlogPosts();
     setState(() {
-      _blogPosts = posts;
-      _isLoading = false;
+      _isLoading = true;
     });
+
+    try {
+      // Fetch posts from the API using BlogService
+      final response = await BlogService.instance.getPosts();
+      final postsData = response['data']['data'] as List<dynamic>;
+
+      // Convert API response to BlogPost objects
+      final List<BlogPost> posts = [];
+      for (var post in postsData) {
+        posts.add(
+          BlogPost(
+            id: post['id'].toString(),
+            imagePath:
+                post['thumbnail_path'] ?? 'assets/images/default-blog.png',
+            category:
+                post['categories']?.isNotEmpty
+                    ? post['categories'][0]['name']
+                    : 'Uncategorized',
+            title: post['title'] ?? '',
+            author: post['user']['name'] ?? 'Unknown Author',
+            authorImage:
+                post['user']['picture'] ?? 'assets/images/profile-photo.png',
+            timeAgo: _formatDate(post['created_at']),
+            content: post['content'] ?? '',
+          ),
+        );
+      }
+
+      setState(() {
+        _blogPosts = posts;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error fetching blog posts: $e');
+      setState(() {
+        _isLoading = false;
+        _blogPosts = []; // Empty list on error
+      });
+
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load posts: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
+  // Helper method to format date string
+  String _formatDate(String? dateString) {
+    if (dateString == null) return 'Just now';
+
+    try {
+      final date = DateTime.parse(dateString);
+      final now = DateTime.now();
+      final difference = now.difference(date);
+
+      if (difference.inDays > 30) {
+        return '${(difference.inDays / 30).floor()} month(s) ago';
+      } else if (difference.inDays > 0) {
+        return '${difference.inDays} day(s) ago';
+      } else if (difference.inHours > 0) {
+        return '${difference.inHours} hour(s) ago';
+      } else if (difference.inMinutes > 0) {
+        return '${difference.inMinutes} minute(s) ago';
+      } else {
+        return 'Just now';
+      }
+    } catch (e) {
+      return 'Recently';
+    }
   }
 
   String get _selectedTag {
@@ -95,7 +166,7 @@ class _MainPageState extends State<MainPage> {
         color: Colors.white,
         child:
             _isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? const LoadingVideo()
                 : filteredContent.isEmpty
                 ? const Center(child: Text('No content available.'))
                 : ListView.builder(
@@ -115,6 +186,13 @@ class _MainPageState extends State<MainPage> {
                     );
                   },
                 ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.pushNamed(context, blogMakerRoute);
+        },
+        backgroundColor: Colors.black,
+        child: const Icon(Icons.edit, color: Colors.white),
       ),
       bottomNavigationBar: const CustomNavBar(),
     );

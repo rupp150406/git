@@ -1,3 +1,5 @@
+![Logo Aplikasi](./assets/images/logo.png)
+
 Blogin App: Platform Blogging Mobile
 Blogin App adalah platform aplikasi mobile yang dibangun dengan Flutter, 
 dirancang untuk memudahkan pengguna membuat, berbagi, dan menikmati konten blog. 

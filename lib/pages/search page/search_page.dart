@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:blogin/widgets/custom navbar/custom_navbar.dart';
 import 'package:blogin/services/hive_backend.dart';
 import 'package:blogin/pages/blog/widget_content.dart';
+import 'package:blogin/routes/route.dart';
 
 enum SearchState { initial, suggestions, results }
 
@@ -231,6 +232,13 @@ class _SearchPageState extends State<SearchPage> {
             ),
           ],
         ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.pushNamed(context, blogMakerRoute);
+        },
+        backgroundColor: Colors.black,
+        child: const Icon(Icons.edit, color: Colors.white),
       ),
     );
   }

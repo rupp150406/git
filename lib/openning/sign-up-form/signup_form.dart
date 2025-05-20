@@ -3,7 +3,7 @@ import 'package:blogin/widgets/custom%20button/custom_button.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:blogin/routes/route.dart'; // Import routes
-import 'package:blogin/services/local_backend_service.dart';
+import 'package:blogin/services/user_service.dart';
 
 // Custom Animated Checkbox Widget
 class CustomAnimatedCheckbox extends StatefulWidget {
@@ -96,24 +96,29 @@ class SignUpScreen extends StatefulWidget {
 }
 
 class _SignUpScreenState extends State<SignUpScreen> {
+  final _nameController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   bool _obscurePassword = true;
-  bool _agreeToTerms = false; // Changed default value to false
-  bool _showTermsError = false; // New state variable for error
+  bool _obscureConfirmPassword = true;
+  bool _agreeToTerms = false;
+  bool _showTermsError = false;
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    // Initialize email in LocalBackendService if it doesn't exist
-    // Ini sebaiknya dilakukan saat pengguna benar-benar memasukkan email, bukan saat halaman baru dibuat
-    // LocalBackendService.instance.setEmail(_emailController.text.trim());
   }
 
   @override
   void dispose() {
+    _nameController.dispose();
+    _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -121,6 +126,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
   void _togglePasswordVisibility() {
     setState(() {
       _obscurePassword = !_obscurePassword;
+    });
+  }
+
+  // Method to toggle confirm password visibility
+  void _toggleConfirmPasswordVisibility() {
+    setState(() {
+      _obscureConfirmPassword = !_obscureConfirmPassword;
     });
   }
 
@@ -133,6 +145,83 @@ class _SignUpScreenState extends State<SignUpScreen> {
     }
   }
 
+  Future<void> _handleSignUp() async {
+    final String enteredName = _nameController.text.trim();
+    final String enteredUsername = _usernameController.text.trim();
+    final String enteredEmail = _emailController.text.trim();
+    final String enteredPassword = _passwordController.text.trim();
+    final String enteredConfirmPassword =
+        _confirmPasswordController.text.trim();
+
+    // Validate passwords match
+    if (enteredPassword != enteredConfirmPassword) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Passwords do not match'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Check if terms are agreed
+    if (!_agreeToTerms) {
+      setState(() {
+        _showTermsError = true;
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _showTermsError = false;
+    });
+
+    try {
+      // Register user using UserService
+      final response = await UserService.instance.register(
+        name: enteredName,
+        username: enteredUsername,
+        email: enteredEmail,
+        password: enteredPassword,
+        passwordConfirmation: enteredConfirmPassword,
+      );
+
+      if (mounted) {
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Registration successful!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // Navigate to next screen
+        Navigator.pushNamed(
+          context,
+          nameFormDoneSplashRoute,
+          arguments: enteredEmail,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // Define consistent text styles - adjust font size and weight as needed
@@ -140,7 +229,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     const TextStyle labelStyle = TextStyle(
       fontFamily: fontFamily,
       fontSize: 14,
-      fontWeight: FontWeight.w600, // Semi-bold
+      fontWeight: FontWeight.w600,
       color: Colors.black,
     );
     final TextStyle hintStyle = TextStyle(
@@ -160,66 +249,82 @@ class _SignUpScreenState extends State<SignUpScreen> {
         vertical: 12.0,
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12.0), // Rounded border
+        borderRadius: BorderRadius.circular(12.0),
         borderSide: BorderSide(color: Colors.grey[300]!, width: 1.0),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12.0),
-        borderSide: const BorderSide(
-          color: Colors.black,
-          width: 1.5,
-        ), // Focus border
+        borderSide: const BorderSide(color: Colors.black, width: 1.5),
       ),
-      // Add other decoration properties if needed (e.g., errorBorder)
     );
 
     return WillPopScope(
-      onWillPop: () async => false, // Prevent back navigation
+      onWillPop: () async => false,
       child: Scaffold(
         backgroundColor: Colors.white,
         appBar: AppBar(
           backgroundColor: Colors.white,
-          elevation: 0, // No shadow
-          leading: null, // Remove the leading widget (back button)
-          automaticallyImplyLeading:
-              false, // Prevent Flutter from adding a default back button
+          elevation: 0,
+          leading: null,
+          automaticallyImplyLeading: false,
         ),
         body: SafeArea(
-          // Use SafeArea to avoid overlaps with system UI
           child: SingleChildScrollView(
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 24.0,
-              ), // Overall horizontal padding
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  const SizedBox(height: 20), // Space below AppBar
-                  // Headline
+                  const SizedBox(height: 20),
                   const Text(
                     'Create an Account',
                     style: TextStyle(
                       fontFamily: fontFamily,
-                      fontSize: 28, // Large font size
+                      fontSize: 28,
                       fontWeight: FontWeight.bold,
                       color: Colors.black,
                     ),
                   ),
-                  const SizedBox(
-                    height: 8,
-                  ), // Space between headline and subtitle
-                  // Subtitle
+                  const SizedBox(height: 8),
                   Text(
                     'Join us today and unlock endless possibilities. It\'s quick, easy, and just a step away!',
-                    style: bodyTextStyle.copyWith(
-                      fontSize: 14,
-                    ), // Adjust size if needed
+                    style: bodyTextStyle.copyWith(fontSize: 14),
                   ),
-                  const SizedBox(height: 30), // Space before Email label
-                  // Email Label
+                  const SizedBox(height: 30),
+
+                  // Name Field
+                  const Text('Full Name', style: labelStyle),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _nameController,
+                    decoration: inputDecoration.copyWith(
+                      hintText: 'Enter your full name..',
+                    ),
+                    style: const TextStyle(
+                      fontFamily: fontFamily,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Username Field
+                  const Text('Username', style: labelStyle),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _usernameController,
+                    decoration: inputDecoration.copyWith(
+                      hintText: 'Enter your username..',
+                    ),
+                    style: const TextStyle(
+                      fontFamily: fontFamily,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Email Field
                   const Text('Email', style: labelStyle),
-                  const SizedBox(height: 8), // Space between label and input
-                  // Email Input
+                  const SizedBox(height: 8),
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
@@ -231,16 +336,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       fontSize: 14,
                     ),
                   ),
-                  const SizedBox(height: 20), // Space before Password label
-                  // Password Label
+                  const SizedBox(height: 20),
+
+                  // Password Field
                   const Text('Password', style: labelStyle),
-                  const SizedBox(height: 8), // Space between label and input
-                  // Password Input
+                  const SizedBox(height: 8),
                   TextFormField(
                     controller: _passwordController,
                     obscureText: _obscurePassword,
                     decoration: inputDecoration.copyWith(
-                      hintText: 'Enter your Password..',
+                      hintText: 'Enter your password..',
                       suffixIcon: IconButton(
                         icon: Icon(
                           _obscurePassword
@@ -256,128 +361,99 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       fontSize: 14,
                     ),
                   ),
-                  const SizedBox(height: 20), // Space before Checkbox row
+                  const SizedBox(height: 20),
+
+                  // Confirm Password Field
+                  const Text('Confirm Password', style: labelStyle),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _confirmPasswordController,
+                    obscureText: _obscureConfirmPassword,
+                    decoration: inputDecoration.copyWith(
+                      hintText: 'Confirm your password..',
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscureConfirmPassword
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                          color: Colors.grey[500],
+                        ),
+                        onPressed: _toggleConfirmPasswordVisibility,
+                      ),
+                    ),
+                    style: const TextStyle(
+                      fontFamily: fontFamily,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
                   // Terms Checkbox Row
                   Row(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start, // Align items to the top
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      // Use the custom checkbox
                       CustomAnimatedCheckbox(
                         value: _agreeToTerms,
                         onChanged: (newValue) {
                           setState(() {
                             _agreeToTerms = newValue;
-                            // Reset error state when checkbox is changed
                             if (_showTermsError) {
                               _showTermsError = false;
                             }
                           });
                         },
-                        // You can optionally adjust size/duration here:
-                        // size: 20.0,
-                        // duration: Duration(milliseconds: 150),
                         showError: _showTermsError,
                       ),
-                      const SizedBox(
-                        width: 10,
-                      ), // Adjusted space between checkbox and text
+                      const SizedBox(width: 10),
                       Expanded(
-                        // Allow text to wrap
                         child: Padding(
-                          padding: const EdgeInsets.only(
-                            top: 2.0,
-                          ), // Fine-tune text alignment to match checkbox center
+                          padding: const EdgeInsets.only(top: 2.0),
                           child: Text(
                             'By Creating an account, you agree to our Terms and Conditions and Privacy Notice.',
-                            style: bodyTextStyle.copyWith(
-                              fontSize: 12,
-                            ), // Smaller text
+                            style: bodyTextStyle.copyWith(fontSize: 12),
                           ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 30), // Space before Sign Up button
+                  const SizedBox(height: 30),
+
                   // Sign Up Button
                   SizedBox(
-                    width: double.infinity, // Full width
+                    width: double.infinity,
                     child: CustomButton(
                       text: 'Sign Up',
-                      onPressed: () async {
-                        // Get entered credentials
-                        final String enteredEmail =
-                            _emailController.text.trim();
-                        final String enteredPassword =
-                            _passwordController.text.trim();
-
-                        // Check if terms are agreed
-                        if (!_agreeToTerms) {
-                          // Show terms error and do not proceed
-                          setState(() {
-                            _showTermsError = true;
-                          });
-                          print('Sign Up button pressed - Terms not agreed');
-                          return; // Stop execution here
-                        }
-
-                        // Simpan email dan password ke LocalBackendService
-                        await LocalBackendService.instance.setEmail(
-                          enteredEmail,
-                        );
-                        await LocalBackendService.instance.updatePassword(
-                          enteredPassword,
-                        );
-
-                        // Navigate to OTP screen
-                        setState(() {
-                          _showTermsError = false; // Ensure error is cleared
-                        });
-                        print(
-                          'Sign Up button pressed - Credentials saved, navigating to OTP',
-                        );
-                        Navigator.pushNamed(
-                          context,
-                          otpRoute,
-                          arguments: enteredEmail,
-                        );
-                      },
+                      onPressed: _handleSignUp,
                     ),
                   ),
-                  const SizedBox(
-                    height: 30,
-                  ), // Space before "Already have an account?" text
-                  // "Already have an account?" Link
+                  const SizedBox(height: 30),
+
+                  // Sign In Link
                   Center(
-                    // Center the text
                     child: RichText(
                       textAlign: TextAlign.center,
                       text: TextSpan(
-                        style: bodyTextStyle.copyWith(
-                          fontSize: 14,
-                        ), // Default style
+                        style: bodyTextStyle.copyWith(fontSize: 14),
                         children: <TextSpan>[
                           const TextSpan(text: 'Already have an account? '),
                           TextSpan(
                             text: 'Sign In',
                             style: const TextStyle(
                               fontFamily: fontFamily,
-                              color: Colors.blue, // Blue color for link
-                              fontWeight: FontWeight.w600, // Semi-bold
+                              color: Colors.blue,
+                              fontWeight: FontWeight.w600,
                             ),
                             recognizer:
                                 TapGestureRecognizer()
                                   ..onTap = () {
-                                    // Navigate using named route
                                     Navigator.pushNamed(context, signInRoute);
-                                    // print('Sign In link tapped'); // Keep for debug if needed
                                   },
                           ),
                         ],
                       ),
                     ),
                   ),
-                  const SizedBox(height: 30), // Space at the bottom
+                  const SizedBox(height: 30),
                 ],
               ),
             ),

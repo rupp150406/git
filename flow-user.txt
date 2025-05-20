@@ -1,0 +1,102 @@
+USER AUTHENTICATION FLOW
+=======================
+
+1. SIGN UP PROCESS
+-----------------
+a) User enters registration details:
+   - Full Name
+   - Username
+   - Email
+   - Password
+   - Confirm Password
+   - Agrees to Terms & Conditions
+
+b) Validation checks:
+   - All fields are required
+   - Passwords must match
+   - Terms & Conditions must be agreed to
+   - Email format validation
+
+c) API Call:
+   - Endpoint: https://blogin.faaza-mumtaza.my.id/api/auth/register
+   - Method: POST
+   - Headers: Content-Type: application/json
+   - Body: {
+     "name": "user's name",
+     "username": "user's username",
+     "email": "user's email",
+     "password": "user's password",
+     "password_confirmation": "confirmed password"
+   }
+
+d) Response Handling:
+   - Success (200/201):
+     * Saves authentication token
+     * Navigates to nameFormDoneSplashRoute
+   - Error:
+     * Shows error message in SnackBar
+     * Stays on signup form
+
+2. SIGN IN PROCESS
+-----------------
+a) User enters credentials:
+   - Email
+   - Password
+
+b) Validation checks:
+   - Email format validation
+   - Password field not empty
+
+c) API Call:
+   - Endpoint: https://blogin.faaza-mumtaza.my.id/api/auth/login
+   - Method: POST
+   - Headers: Content-Type: application/json
+   - Body: {
+     "email": "user's email",
+     "password": "user's password"
+   }
+
+d) Response Handling:
+   - Success (200):
+     * Saves authentication token
+     * Navigates to mainPageRoute
+   - Error:
+     * Shows error message in SnackBar
+     * Stays on signin form
+
+3. TOKEN MANAGEMENT
+------------------
+- Token is stored using LocalBackendService
+- Token is included in subsequent API requests
+- Token is cleared on:
+  * Logout
+  * Account deletion
+  * Failed authentication
+
+4. ERROR HANDLING
+----------------
+- Network errors
+- Invalid credentials
+- Server errors
+- Validation errors
+All errors are displayed to user via SnackBar with 3-second duration
+
+5. NAVIGATION FLOW
+-----------------
+Sign Up:
+- Sign Up Form -> nameFormDoneSplashRoute (on success)
+- Sign Up Form -> Sign In Form (via "Already have an account?")
+
+Sign In:
+- Sign In Form -> mainPageRoute (on success)
+- Sign In Form -> Sign Up Form (via "Don't have an account?")
+
+6. SECURITY FEATURES
+-------------------
+- Password visibility toggle
+- Password confirmation
+- Terms & Conditions agreement
+- Token-based authentication
+- Secure password transmission
+- Form validation
+- Error message sanitization 

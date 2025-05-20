@@ -1,58 +1,74 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 class LocalBackendService {
-  static final LocalBackendService instance = LocalBackendService._();
-  LocalBackendService._();
-
-  static const String _usernameKey = 'username';
+  static LocalBackendService? _instance;
   static const String _emailKey = 'email';
   static const String _passwordKey = 'password';
-  static const String _aboutKey = 'about';
+  static const String _usernameKey = 'username';
+  static const String _tokenKey = 'token';
 
-  late SharedPreferences _prefs;
-
-  Future<void> init() async {
-    _prefs = await SharedPreferences.getInstance();
+  // Singleton pattern
+  static LocalBackendService get instance {
+    _instance ??= LocalBackendService();
+    return _instance!;
   }
 
-  String getUsername() {
-    return _prefs.getString(_usernameKey) ?? '';
+  // Get SharedPreferences instance
+  Future<SharedPreferences> get _prefs async {
+    return await SharedPreferences.getInstance();
   }
 
+  // Email methods
+  Future<void> setEmail(String email) async {
+    final prefs = await _prefs;
+    await prefs.setString(_emailKey, email);
+  }
+
+  Future<String?> getEmail() async {
+    final prefs = await _prefs;
+    return prefs.getString(_emailKey);
+  }
+
+  // Password methods
+  Future<void> updatePassword(String password) async {
+    final prefs = await _prefs;
+    await prefs.setString(_passwordKey, password);
+  }
+
+  Future<String?> getPassword() async {
+    final prefs = await _prefs;
+    return prefs.getString(_passwordKey);
+  }
+
+  // Username methods
   Future<void> setUsername(String username) async {
-    await _prefs.setString(_usernameKey, username);
+    final prefs = await _prefs;
+    await prefs.setString(_usernameKey, username);
   }
 
-  String getEmail() {
-    return _prefs.getString(_emailKey) ?? '';
+  Future<String?> getUsername() async {
+    final prefs = await _prefs;
+    return prefs.getString(_usernameKey);
   }
 
-  Future<void> setEmail(String initialEmail) async {
-    if (!_prefs.containsKey(_emailKey)) {
-      await _prefs.setString(_emailKey, initialEmail);
+  // Token methods
+  Future<void> setToken(String? token) async {
+    final prefs = await _prefs;
+    if (token != null) {
+      await prefs.setString(_tokenKey, token);
+    } else {
+      await prefs.remove(_tokenKey);
     }
   }
 
-  String getAbout() {
-    return _prefs.getString(_aboutKey) ?? 'just a simple person';
+  Future<String?> getToken() async {
+    final prefs = await _prefs;
+    return prefs.getString(_tokenKey);
   }
 
-  Future<void> setAbout(String about) async {
-    await _prefs.setString(_aboutKey, about);
-  }
-
-  String getPassword() {
-    return _prefs.getString(_passwordKey) ?? '';
-  }
-
-  Future<void> updatePassword(String newPassword) async {
-    await _prefs.setString(_passwordKey, newPassword);
-  }
-
-  Future<void> clearUserData() async {
-    await _prefs.remove(_usernameKey);
-    await _prefs.remove(_emailKey);
-    await _prefs.remove(_passwordKey);
-    await _prefs.remove(_aboutKey);
+  // Clear all data
+  Future<void> clearAll() async {
+    final prefs = await _prefs;
+    await prefs.clear();
   }
 }

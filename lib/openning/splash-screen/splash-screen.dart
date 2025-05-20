@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:blogin/widgets/custom%20button/custom_button.dart'; // Import the custom button
 import 'package:blogin/routes/route.dart'; // Import routes
 import 'package:blogin/services/local_backend_service.dart';
+import 'package:blogin/services/user_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -21,26 +22,64 @@ class _SplashScreenState extends State<SplashScreen> {
     // Show first stage splash screen for 3 seconds
     Timer(const Duration(seconds: 3), () {
       if (mounted) {
-        _checkAccountAndNavigate();
+        _checkAuthAndNavigate();
       }
     });
   }
 
-  Future<void> _checkAccountAndNavigate() async {
-    // Initialize the local backend service
-    await LocalBackendService.instance.init();
+  Future<void> _checkAuthAndNavigate() async {
+    try {
+      // Check if user has a saved auth token
+      final token = await LocalBackendService.instance.getToken();
 
-    // Check if there's an existing account
-    final username = LocalBackendService.instance.getUsername();
-    final email = LocalBackendService.instance.getEmail();
-
-    // If both username and email exist, navigate to main page
-    if (username.isNotEmpty && email.isNotEmpty) {
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, mainPageRoute);
+      if (token != null && token.isNotEmpty) {
+        // Token exists, try to verify it's still valid by fetching profile
+        try {
+          await UserService.instance.getProfile();
+          // Profile fetch successful, token is valid
+          if (mounted) {
+            Navigator.pushReplacementNamed(context, mainPageRoute);
+            return;
+          }
+        } catch (e) {
+          // Token is invalid or expired, continue to check credentials
+          print('Token validation failed: $e');
+        }
       }
-    } else {
-      // If no account exists, proceed to second stage
+
+      // If token validation failed or no token exists,
+      // check if we have saved credentials
+      final email = await LocalBackendService.instance.getEmail();
+      final password = await LocalBackendService.instance.getPassword();
+
+      if (email != null &&
+          email.isNotEmpty &&
+          password != null &&
+          password.isNotEmpty) {
+        // Try to log in with saved credentials
+        try {
+          await UserService.instance.login(email: email, password: password);
+
+          // Login successful, navigate to main page
+          if (mounted) {
+            Navigator.pushReplacementNamed(context, mainPageRoute);
+            return;
+          }
+        } catch (e) {
+          // Login with saved credentials failed
+          print('Auto-login failed: $e');
+        }
+      }
+
+      // If we reach here, we need to show the second stage
+      if (mounted) {
+        setState(() {
+          _showSecondStage = true;
+        });
+      }
+    } catch (e) {
+      // For any unexpected errors, show the second stage
+      print('Authentication check error: $e');
       if (mounted) {
         setState(() {
           _showSecondStage = true;
@@ -52,12 +91,9 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor:
-          Colors.white, // Common background for both stages initially
+      backgroundColor: Colors.white,
       body: AnimatedSwitcher(
-        duration: const Duration(
-          milliseconds: 300,
-        ), // Changed duration to 300ms
+        duration: const Duration(milliseconds: 300),
         transitionBuilder: (Widget child, Animation<double> animation) {
           // Use FadeTransition for smooth cross-fade
           return FadeTransition(opacity: animation, child: child);
@@ -169,7 +205,6 @@ class _SplashScreenState extends State<SplashScreen> {
                       onPressed: () {
                         // Navigate using named route
                         Navigator.pushReplacementNamed(context, signUpRoute);
-                        // print('Get Started button pressed'); // Keep if needed for debug
                       },
                     ),
                   ),

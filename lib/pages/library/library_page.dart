@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'package:blogin/pages/blog/widget_content.dart';
 import '../../services/hive_backend.dart';
+import 'package:blogin/routes/route.dart';
 
 class LibraryPage extends StatefulWidget {
   const LibraryPage({Key? key}) : super(key: key);
@@ -259,6 +260,13 @@ class _LibraryPageState extends State<LibraryPage> {
             ),
           ],
         ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.pushNamed(context, blogMakerRoute);
+        },
+        backgroundColor: Colors.black,
+        child: const Icon(Icons.edit, color: Colors.white),
       ),
     );
   }

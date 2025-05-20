@@ -26,7 +26,7 @@ class _EmailInputPageState extends State<EmailInputPage> {
 
       if (inputEmail == storedEmail) {
         if (mounted) {
-          Navigator.pushNamed(context, otpConfirmationRoute);
+          // Navigator.pushNamed(context, otpConfirmation());
         }
       } else {
         if (mounted) {

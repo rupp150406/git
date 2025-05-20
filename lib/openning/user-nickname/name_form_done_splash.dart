@@ -35,7 +35,7 @@ class _NameFormDoneSplashScreenState extends State<NameFormDoneSplashScreen>
     Timer(const Duration(seconds: 2), () {
       // Total time on this screen
       if (mounted) {
-        Navigator.of(context).pushReplacementNamed(mainPageRoute);
+        Navigator.of(context).pushReplacementNamed(signInRoute);
       }
     });
   }

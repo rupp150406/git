@@ -5,6 +5,8 @@ import '../../services/hive_backend.dart';
 import '../../services/saved_content_service.dart';
 import '../../services/viewed_history_service.dart';
 import '../../widgets/custom popup/custom_popup.dart';
+import '../../services/blog_service.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'content_page.dart';
 
 class WidgetContent extends StatefulWidget {
@@ -98,6 +100,9 @@ class _WidgetContentState extends State<WidgetContent> {
 
   @override
   Widget build(BuildContext context) {
+    print('Building WidgetContent for blog: ${widget.blogPost.id}');
+    print('Image path: ${widget.blogPost.imagePath}');
+
     return GestureDetector(
       onTap: () {
         _addToHistory();
@@ -135,80 +140,100 @@ class _WidgetContentState extends State<WidgetContent> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      widget.blogPost.category,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: Colors.grey[600],
-                        fontWeight: FontWeight.w500,
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width * 0.5,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      child: Text(
+                        widget.blogPost.category,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      _formatTitleToTwoWords(widget.blogPost.title),
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width * 0.5,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      child: Text(
+                        widget.blogPost.title,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                     const Spacer(),
-                    Row(
-                      children: [
-                        Container(
-                          width: 26,
-                          height: 26,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[200],
-                            border: Border.all(
-                              color: Colors.grey[300]!,
-                              width: 1,
+                    Flexible(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 26,
+                            height: 26,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[200],
+                              border: Border.all(
+                                color: Colors.grey[300]!,
+                                width: 1,
+                              ),
+                              borderRadius: BorderRadius.circular(6),
                             ),
-                            borderRadius: BorderRadius.circular(6),
+                            clipBehavior: Clip.hardEdge,
+                            child:
+                                widget.blogPost.authorImage.startsWith(
+                                      'assets/',
+                                    )
+                                    ? Image.asset(
+                                      widget.blogPost.authorImage,
+                                      width: 26,
+                                      height: 26,
+                                      fit: BoxFit.cover,
+                                    )
+                                    : Image.network(
+                                      widget.blogPost.authorImage,
+                                      width: 26,
+                                      height: 26,
+                                      fit: BoxFit.cover,
+                                      errorBuilder:
+                                          (context, error, stackTrace) =>
+                                              const Icon(
+                                                Icons.person,
+                                                size: 16,
+                                                color: Colors.grey,
+                                              ),
+                                    ),
                           ),
-                          clipBehavior: Clip.hardEdge,
-                          child:
-                              widget.blogPost.authorImage.startsWith('assets/')
-                                  ? Image.asset(
-                                    widget.blogPost.authorImage,
-                                    width: 26,
-                                    height: 26,
-                                    fit: BoxFit.cover,
-                                  )
-                                  : Image.file(
-                                    File(widget.blogPost.authorImage),
-                                    width: 26,
-                                    height: 26,
-                                    fit: BoxFit.cover,
-                                    errorBuilder:
-                                        (context, error, stackTrace) =>
-                                            const Icon(
-                                              Icons.person,
-                                              size: 16,
-                                              color: Colors.grey,
-                                            ),
-                                  ),
-                        ),
-                        const SizedBox(width: 7),
-                        Flexible(
-                          child: Text(
-                            widget.blogPost.author,
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(fontWeight: FontWeight.w500),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          const SizedBox(width: 7),
+                          Flexible(
+                            child: Text(
+                              widget.blogPost.author,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(fontWeight: FontWeight.w500),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          widget.blogPost.timeAgo,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: Colors.grey[500], fontSize: 12),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              widget.blogPost.timeAgo,
+                              style: Theme.of(
+                                context,
+                              ).textTheme.bodySmall?.copyWith(
+                                color: Colors.grey[500],
+                                fontSize: 12,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -322,52 +347,114 @@ class _WidgetContentState extends State<WidgetContent> {
   }
 
   Widget _buildImage(String imagePath) {
-    try {
-      if (imagePath.startsWith('assets/')) {
-        return Image.asset(
-          imagePath,
-          fit: BoxFit.cover,
-          width: 90,
-          height: 90,
-          errorBuilder:
-              (context, error, stackTrace) => _buildErrorPlaceholder(),
-        );
-      }
+    print('[WidgetContent] Building image: $imagePath');
 
-      // Check if file exists before attempting to load it
-      final file = File(imagePath);
-      if (!file.existsSync()) {
-        return _buildErrorPlaceholder();
-      }
-
-      return Image.file(
-        file,
-        fit: BoxFit.cover,
-        width: 90,
-        height: 90,
-        errorBuilder: (context, error, stackTrace) => _buildErrorPlaceholder(),
-      );
-    } catch (e) {
-      return _buildErrorPlaceholder();
-    }
-  }
-
-  Widget _buildErrorPlaceholder() {
-    return Container(
-      color: Colors.grey[200],
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.broken_image_rounded, size: 32, color: Colors.grey[400]),
-            const SizedBox(height: 4),
-            Text(
-              'No Image',
-              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+    // Setup default fallback image
+    final defaultImage = Image.asset(
+      'assets/images/default-blog.png',
+      fit: BoxFit.cover,
+      errorBuilder:
+          (context, error, stackTrace) => const Center(
+            child: Icon(
+              Icons.image_not_supported,
+              color: Colors.grey,
+              size: 40,
             ),
-          ],
-        ),
-      ),
+          ),
     );
+
+    if (imagePath.isEmpty) {
+      print('[WidgetContent] Empty image path, showing default');
+      return defaultImage;
+    }
+
+    if (imagePath.startsWith('assets/')) {
+      print('[WidgetContent] Loading from assets: $imagePath');
+      return Image.asset(
+        imagePath,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          print('[WidgetContent] Error loading asset image: $error');
+          return defaultImage;
+        },
+      );
+    } else {
+      try {
+        // Special handling for specific URL pattern from the API
+        String url;
+        if (imagePath.contains(
+              'cnWqCxHLGVM6GFxOjnJZf2s7qYt9DgscrYuEZTF8.jpg',
+            ) ||
+            RegExp(r'[a-zA-Z0-9]{20,}\.(jpg|jpeg|png)$').hasMatch(imagePath)) {
+          // This is the special case for the long random filenames
+          url =
+              imagePath.startsWith('http')
+                  ? imagePath
+                  : 'https://blogin.faaza-mumtaza.my.id/storage/posts/thumbnails/${imagePath.split('/').last}';
+          print('[WidgetContent] Using direct API URL format: $url');
+        } else {
+          // Standard URL formatting
+          url =
+              imagePath.startsWith('http')
+                  ? imagePath
+                  : BlogService.instance.formatBlogImageUrl(imagePath);
+          print('[WidgetContent] Using standard formatted URL: $url');
+        }
+
+        return CachedNetworkImage(
+          imageUrl: url,
+          fit: BoxFit.cover,
+          fadeInDuration: const Duration(milliseconds: 500),
+          placeholder:
+              (context, url) => Center(
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.grey[400],
+                ),
+              ),
+          imageBuilder: (context, imageProvider) {
+            print('[WidgetContent] Image loaded successfully: $url');
+            return Container(
+              decoration: BoxDecoration(
+                image: DecorationImage(image: imageProvider, fit: BoxFit.cover),
+              ),
+            );
+          },
+          errorWidget: (context, url, error) {
+            print('[WidgetContent] Error loading image: $error');
+            print('[WidgetContent] Failed URL: $url (Original: $imagePath)');
+
+            // Try a direct hard-coded URL to test connectivity
+            final directUrl =
+                'https://blogin.faaza-mumtaza.my.id/storage/posts/thumbnails/cnWqCxHLGVM6GFxOjnJZf2s7qYt9DgscrYuEZTF8.jpg';
+            print('[WidgetContent] Trying direct URL to test: $directUrl');
+
+            // Try a hardcoded URL as last resort for testing
+            final fallbackUrl =
+                'https://blogin.faaza-mumtaza.my.id/storage/posts/thumbnails/default.jpg';
+            print('[WidgetContent] Trying fallback URL: $fallbackUrl');
+
+            return Image.network(
+              directUrl, // Try the direct URL first
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                print('[WidgetContent] Direct URL also failed: $error');
+                return Image.network(
+                  fallbackUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    print('[WidgetContent] Fallback also failed: $error');
+                    return defaultImage;
+                  },
+                );
+              },
+            );
+          },
+        );
+      } catch (e) {
+        print('[WidgetContent] Exception in image handling: $e');
+        return defaultImage;
+      }
+    }
   }
 }

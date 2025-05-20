@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:blogin/widgets/contain navbar/contain_navbar.dart';
 import 'package:blogin/services/hive_backend.dart';
 import 'category_page.dart';
 
@@ -248,7 +247,6 @@ class _BlogMakerPageState extends State<BlogMakerPage> {
           ),
         ),
       ),
-      bottomNavigationBar: const ContainNavBar(),
     );
   }
 }

@@ -36,7 +36,7 @@ class _SaveProfileDoneSplashScreenState
     Timer(const Duration(seconds: 2), () {
       // Total time on this screen
       if (mounted) {
-        Navigator.of(context).pushReplacementNamed(mainPageRoute);
+        Navigator.of(context).pushReplacementNamed(profilePageRoute);
       }
     });
   }
